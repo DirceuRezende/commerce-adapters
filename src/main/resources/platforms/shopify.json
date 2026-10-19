@@ -1,0 +1,38 @@
+{
+  "platform": "shopify",
+  "operations": {
+    "searchCatalog": {
+      "route": {"transport": "UCP_MCP", "path": "/api/ucp/mcp", "action": "search_catalog"},
+      "requestMapping": {
+        "meta": {"literal": {"ucp-agent": {"profile": "https://shopify.dev/ucp/agent-profiles/examples/2026-08-25/valid-with-capabilities.json"}}},
+        "catalog": {"path": "$", "fields": {
+          "query": {"path": "$.query", "required": true},
+          "pagination": {"path": "$", "fields": {"limit": {"path": "$.limit"}}}
+        }}
+      },
+      "responseMapping": {
+        "products": {"path": "$.products[*]", "required": true, "each": {
+          "id": {"path": "$.id", "required": true},
+          "name": {"path": "$.title", "required": true},
+          "priceMinor": {"path": "$.price_range.min.amount"},
+          "currency": {"path": "$.price_range.min.currency"}
+        }}
+      }
+    },
+    "createCart": {
+      "route": {"transport": "UCP_MCP", "path": "/api/ucp/mcp", "action": "create_cart"},
+      "requestMapping": {
+        "meta": {"literal": {"ucp-agent": {"profile": "https://shopify.dev/ucp/agent-profiles/examples/2026-08-25/valid-with-capabilities.json"}}},
+        "cart": {"path": "$", "fields": {
+          "line_items": {"path": "$.items[*]", "each": {
+            "item": {"path": "$", "fields": {"id": {"path": "$.externalVariantId"}}},
+            "quantity": {"path": "$.quantity"}
+          }}
+        }}
+      },
+      "responseMapping": {
+        "externalCartId": {"path": "$.id", "required": true}
+      }
+    }
+  }
+}

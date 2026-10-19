@@ -58,6 +58,8 @@ O código principal tem 8 arquivos Java: aplicação, exceção comum, engine, g
 
 Fluxo: `gateway.execute` → `MappingEngine.map(request)` → `switch (transport)` (`REST` → `HttpAdapter.rest`, `GRAPHQL` → `HttpAdapter.graphql`, `UCP_MCP` → `McpAdapter.call`) → `MappingEngine.map(response)`.
 
+Suppliers de uma plataforma com template (`src/main/resources/platforms/*.json`, hoje `shopify`) declaram só `platform` e `connection` e herdam operações e mappings padrão, podendo sobrescrever cada operação.
+
 Explicação detalhada de cada classe de mapping e integração: [docs/fluxo.md](docs/fluxo.md).
 
 - `MappingEngine`: valida, compila e aplica regras de JsonPath, literais, transforms, arrays e objetos para request e response.

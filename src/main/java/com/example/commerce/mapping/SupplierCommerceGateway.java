@@ -9,6 +9,8 @@ import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.node.ObjectNode;
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -34,9 +36,11 @@ public class SupplierCommerceGateway implements ApplicationRunner {
     private final MappingEngine engine;
     private final HttpAdapter http;
     private final McpAdapter mcp;
+    private final Map<String, JsonNode> platforms;
 
     public SupplierCommerceGateway(JsonMapper mapper, MappingEngine engine, HttpAdapter http, McpAdapter mcp) {
         this.mapper = mapper; this.engine = engine; this.http = http; this.mcp = mcp;
+        this.platforms = loadPlatforms();
     }
 
     @Override public void run(ApplicationArguments args) throws Exception {
@@ -92,6 +96,7 @@ public class SupplierCommerceGateway implements ApplicationRunner {
 
     private SupplierVersion compile(JsonNode definition) {
         if (definition == null || !definition.isObject()) throw new CommerceException("Documento inválido");
+        definition = withPlatform(definition);
         String supplierId = requiredText(definition, "supplierId");
         if (!supplierId.matches("[a-zA-Z0-9_-]{1,80}")) throw new CommerceException("supplierId inválido");
         JsonNode ver = definition.get("version");
@@ -119,6 +124,46 @@ public class SupplierCommerceGateway implements ApplicationRunner {
         });
         return new SupplierVersion(supplierId, ver.intValue(), Map.copyOf(compiled));
     }
+
+    /** Expands {"platform","connection"}: template operations bound to the supplier's connection; supplier operations override them field by field. */
+    private JsonNode withPlatform(JsonNode definition) {
+        if (!definition.has("platform")) return definition;
+        String platform = requiredText(definition, "platform");
+        JsonNode template = platforms.get(platform);
+        if (template == null) throw new CommerceException("Plataforma desconhecida: " + platform);
+        String connection = requiredText(definition, "connection");
+        ObjectNode operations = (ObjectNode) template.get("operations").deepCopy();
+        operations.forEachEntry((name, op) -> ((ObjectNode) op.get("route")).put("connection", connection));
+        definition.path("operations").forEachEntry((name, override) -> {
+            if (!override.isObject()) throw new CommerceException("Operação inválida: " + name);
+            if (operations.get(name) instanceof ObjectNode base) base.setAll((ObjectNode) override.deepCopy());
+            else operations.set(name, override.deepCopy());
+        });
+        ObjectNode expanded = (ObjectNode) definition.deepCopy();
+        expanded.set("operations", operations);
+        return expanded;
+    }
+
+    private Map<String, JsonNode> loadPlatforms() {
+        var loaded = new HashMap<String, JsonNode>();
+        try {
+            for (var resource : new PathMatchingResourcePatternResolver().getResources("classpath*:platforms/*.json")) {
+                try (var in = resource.getInputStream()) {
+                    JsonNode template = mapper.readTree(in);
+                    if (!template.path("operations").isObject() || template.get("operations").isEmpty())
+                        throw new CommerceException("Template sem operations: " + resource.getFilename());
+                    template.get("operations").forEachEntry((name, op) -> {
+                        if (!op.path("route").isObject()) throw new CommerceException("Template sem route: " + name);
+                    });
+                    loaded.put(requiredText(template, "platform"), template);
+                }
+            }
+        } catch (IOException e) {
+            throw new CommerceException("Falha ao carregar templates de plataforma", e);
+        }
+        return Map.copyOf(loaded);
+    }
+
     private static String requiredText(JsonNode json, String field) {
         JsonNode value = json.get(field);
         if (value == null || !value.isTextual() || value.asText().isBlank())

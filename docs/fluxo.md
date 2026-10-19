@@ -59,6 +59,19 @@ Records internos: `Rule(path, literal, required, transforms, fields, each)` e `T
 
 Por isso, se outra versão for ativada no meio de uma chamada, o request e o response continuam usando o mesmo contrato.
 
+**Templates de plataforma.** No construtor, o gateway carrega `platforms/*.json` (hoje só `shopify.json`). Cada template traz as operações e os mappings padrão de uma plataforma, com rota sem `connection`. Um supplier dessa plataforma declara apenas:
+
+```json
+{"supplierId": "hubii", "version": 1, "platform": "shopify", "connection": "hubii"}
+```
+
+No `publish`, `withPlatform` expande esse documento antes de compilar:
+- Copia as operações do template e preenche `route.connection` com a conexão do supplier.
+- Se o supplier tiver `operations`, cada uma sobrescreve os campos da operação de mesmo nome (`route`, `requestMapping` ou `responseMapping`, campo a campo). Uma operação que não existe no template é adicionada.
+- Plataforma desconhecida ou `connection` ausente falham com `CommerceException`.
+
+Depois da expansão, a validação e o versionamento são os mesmos de um supplier escrito por extenso.
+
 **Records internos:**
 - `Transport` (enum).
 - `Route(transport, connection, path, action)`: para onde e como chamar.
