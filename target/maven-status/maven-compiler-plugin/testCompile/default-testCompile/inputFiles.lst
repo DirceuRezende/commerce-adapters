@@ -3,3 +3,4 @@
 /home/dirceurezende/Development/study/java/pocs/commerce-adapters/src/test/java/com/example/commerce/integration/McpAdapterTest.java
 /home/dirceurezende/Development/study/java/pocs/commerce-adapters/src/test/java/com/example/commerce/mapping/MappingEngineTest.java
 /home/dirceurezende/Development/study/java/pocs/commerce-adapters/src/test/java/com/example/commerce/mapping/SupplierCommerceGatewayTest.java
+/home/dirceurezende/Development/study/java/pocs/commerce-adapters/src/test/java/com/example/commerce/web/CatalogControllerTest.java

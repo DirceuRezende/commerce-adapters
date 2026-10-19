@@ -26,6 +26,14 @@ class MyService {
 }
 ```
 
+Ou via HTTP, para a busca de catálogo (qualquer supplier com a operação `searchCatalog`; no `shopify-a` ela usa UCP_MCP):
+
+```bash
+curl "localhost:8080/suppliers/shopify-a/catalog/search?query=camiseta&limit=5"
+# 200 {"products":[{"id":"...","name":"Camiseta","priceMinor":4990}]}
+# 400 ProblemDetail title=MAPPING_ERROR (supplier/operação inexistente) · 502 title=<code> (falha do parceiro)
+```
+
 Entrada canônica:
 
 ```json
@@ -46,7 +54,7 @@ Saída canônica:
 
 ## Módulos
 
-O código principal tem 7 arquivos Java: aplicação, exceção comum, engine, gateway, configuração de conexões e dois adapters (HTTP e MCP). A API de uso do gateway e os contratos JSON dos fornecedores permanecem os mesmos.
+O código principal tem 8 arquivos Java: aplicação, exceção comum, engine, gateway, configuração de conexões, dois adapters (HTTP e MCP) e o `CatalogController`. A API de uso do gateway e os contratos JSON dos fornecedores permanecem os mesmos.
 
 Fluxo: `gateway.execute` → `MappingEngine.map(request)` → `switch (transport)` (`REST` → `HttpAdapter.rest`, `GRAPHQL` → `HttpAdapter.graphql`, `UCP_MCP` → `McpAdapter.call`) → `MappingEngine.map(response)`.
 
@@ -54,6 +62,7 @@ Fluxo: `gateway.execute` → `MappingEngine.map(request)` → `switch (transport
 - `SupplierCommerceGateway`: carrega os JSONs de `suppliers/*.json` na inicialização, gerencia versões imutáveis (publicação e ativação), fixa uma versão para toda a operação, aplica os dois mappings e despacha pelo enum `Transport` da rota.
 - `HttpAdapter`: JDK HttpClient com redirecionamentos desabilitados, autenticação bearer/api-key, limite de corpo de resposta 2 MB e erros com códigos estruturados. `rest`: GET com query primitives; POST/PUT/PATCH/DELETE em JSON; HTTP status explícito. `graphql`: POST com `query`/`variables`, falha quando houver `errors`, retorna somente `data`.
 - `McpAdapter`: gerencia clientes MCP por conexão/path, inicializa no primeiro uso e fecha na finalização; executa `tools/call` pelo SDK, prioriza `structuredContent`, aceita fallback para texto JSON e rejeita `isError`.
+- `CatalogController`: `GET /suppliers/{supplierId}/catalog/search` executa `searchCatalog` e converte `CommerceException` em `ProblemDetail` (400 para `MAPPING_ERROR`, 502 para falhas do parceiro).
 - `PartnerConnections`: allowlist de conexões nomeadas, segredos fora do mapping e timeout por parceiro.
 - `CommerceException`: erro comum de mapping e integração, com código (`MAPPING_ERROR` para mappings), status HTTP opcional e causa.
 - `AdaptersIntegrationTest`: usa `HttpServer` local e mock do SDK MCP, sem APIs externas.
