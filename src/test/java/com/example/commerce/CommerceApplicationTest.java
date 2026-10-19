@@ -12,7 +12,7 @@ class CommerceApplicationTest {
         try (var context = new SpringApplicationBuilder(CommerceApplication.class)
                 .web(WebApplicationType.NONE).run()) {
             var registry = context.getBean(SupplierCommerceGateway.class);
-            for (String supplier : new String[] {"rest-b", "graphql-c", "shopify-a"}) {
+            for (String supplier : new String[] {"rest-b", "graphql-c", "hubii"}) {
                 assertNotNull(registry.active(supplier).operation("createCart"));
             }
         }

@@ -2,22 +2,27 @@
   "supplierId": "hubii", "version": 1,
   "operations": {
     "searchCatalog": {
-      "route": {"transport": "UCP_MCP", "connection": "https://q6bgwz-c1.myshopify.com", "path": "/api/ucp/mcp", "action": "search_catalog"},
+      "route": {"transport": "UCP_MCP", "connection": "hubii", "path": "/api/ucp/mcp", "action": "search_catalog"},
       "requestMapping": {
-        "query": {"path": "$.query", "required": true},
-        "limit": {"path": "$.limit"}
+        "meta": {"literal": {"ucp-agent": {"profile": "https://shopify.dev/ucp/agent-profiles/examples/2026-08-25/valid-with-capabilities.json"}}},
+        "catalog": {"path": "$", "fields": {
+          "query": {"path": "$.query", "required": true},
+          "pagination": {"path": "$", "fields": {"limit": {"path": "$.limit"}}}
+        }}
       },
       "responseMapping": {
         "products": {"path": "$.products[*]", "required": true, "each": {
           "id": {"path": "$.id", "required": true},
           "name": {"path": "$.title", "required": true},
-          "priceMinor": {"path": "$.price.amount"}
+          "priceMinor": {"path": "$.price_range.min.amount"},
+          "currency": {"path": "$.price_range.min.currency"}
         }}
       }
     },
     "createCart": {
-      "route": {"transport": "UCP_MCP", "connection": "https://q6bgwz-c1.myshopify.com", "path": "/api/ucp/mcp", "action": "create_cart"},
+      "route": {"transport": "UCP_MCP", "connection": "hubii", "path": "/api/ucp/mcp", "action": "create_cart"},
       "requestMapping": {
+        "meta": {"literal": {"ucp-agent": {"profile": "https://shopify.dev/ucp/agent-profiles/examples/2026-08-25/valid-with-capabilities.json"}}},
         "cart": {"path": "$", "fields": {
           "line_items": {"path": "$.items[*]", "each": {
             "item": {"path": "$", "fields": {"id": {"path": "$.externalVariantId"}}},
@@ -26,7 +31,7 @@
         }}
       },
       "responseMapping": {
-        "externalCartId": {"path": "$.cart.id", "required": true}
+        "externalCartId": {"path": "$.id", "required": true}
       }
     }
   }

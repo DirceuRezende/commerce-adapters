@@ -36,23 +36,27 @@ class CatalogControllerTest {
 
     @Test void searchesCatalogThroughUcpMcpAndReturnsCanonicalProducts() throws Exception {
         when(mcp.call(any(), any())).thenReturn(json.readTree("""
-            {"products":[{"id":"gid://shopify/ProductVariant/1","title":"Camiseta","price":{"amount":4990,"currency":"BRL"}}]}
+            {"ucp":{"status":"success"},"products":[{"id":"gid://shopify/Product/1","title":"Ração",
+              "price_range":{"min":{"amount":46124,"currency":"BRL"},"max":{"amount":46124,"currency":"BRL"}}}]}
             """));
 
-        mvc.perform(get("/suppliers/shopify-a/catalog/search").param("query", "camiseta").param("limit", "5"))
+        mvc.perform(get("/suppliers/hubii/catalog/search").param("query", "ração").param("limit", "5"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.products[0].id").value("gid://shopify/ProductVariant/1"))
-            .andExpect(jsonPath("$.products[0].name").value("Camiseta"))
-            .andExpect(jsonPath("$.products[0].priceMinor").value(4990));
+            .andExpect(jsonPath("$.products[0].id").value("gid://shopify/Product/1"))
+            .andExpect(jsonPath("$.products[0].name").value("Ração"))
+            .andExpect(jsonPath("$.products[0].priceMinor").value(46124))
+            .andExpect(jsonPath("$.products[0].currency").value("BRL"));
 
         verify(mcp).call(argThat(route -> route.transport() == UCP_MCP && route.action().equals("search_catalog")),
-            argThat((JsonNode args) -> args.path("query").asText().equals("camiseta") && args.path("limit").intValue() == 5));
+            argThat((JsonNode args) -> args.at("/catalog/query").asText().equals("ração")
+                && args.at("/catalog/pagination/limit").intValue() == 5
+                && args.at("/meta/ucp-agent/profile").isTextual()));
     }
 
     @Test void mapsPartnerFailureToBadGateway() throws Exception {
         when(mcp.call(any(), any())).thenThrow(new CommerceException("MCP_TOOL_ERROR", null, "Ferramenta MCP retornou erro"));
 
-        mvc.perform(get("/suppliers/shopify-a/catalog/search").param("query", "camiseta"))
+        mvc.perform(get("/suppliers/hubii/catalog/search").param("query", "camiseta"))
             .andExpect(status().isBadGateway())
             .andExpect(jsonPath("$.title").value("MCP_TOOL_ERROR"));
     }

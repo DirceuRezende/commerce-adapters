@@ -9,7 +9,6 @@ commerce:
       api-key-header: X-API-Key
       api-key: ${GRAPHQL_C_API_KEY:}
       timeout: 8s
-    shopify-a:
-      base-url: ${SHOPIFY_A_URL:https://shop.example.invalid}
-      bearer-token: ${SHOPIFY_A_TOKEN:}
+    hubii:
+      base-url: ${HUBII_URL:https://q6bgwz-c1.myshopify.com}
       timeout: 15s

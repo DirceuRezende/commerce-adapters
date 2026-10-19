@@ -5,7 +5,7 @@ Projeto de referência integrado de `MappingEngine` + `SupplierCommerceGateway` 
 ## Rodar
 
 1. Requer JDK 25 e Maven 3.9+.
-2. Configure as variáveis opcionais de ambiente `REST_B_URL`, `REST_B_TOKEN`, `GRAPHQL_C_URL`, `GRAPHQL_C_API_KEY`, `SHOPIFY_A_URL`, `SHOPIFY_A_TOKEN`.
+2. Configure as variáveis opcionais de ambiente `REST_B_URL`, `REST_B_TOKEN`, `GRAPHQL_C_URL`, `GRAPHQL_C_API_KEY`, `HUBII_URL`.
 3. Execute `mvn test` e `mvn spring-boot:run`.
 4. Os endpoints `*.example.invalid` e operações como `create_cart` são placeholders: substitua pelos endpoints e ferramentas MCP anunciadas pelo parceiro (`tools/list`) e valide schemas reais.
 
@@ -26,11 +26,11 @@ class MyService {
 }
 ```
 
-Ou via HTTP, para a busca de catálogo (qualquer supplier com a operação `searchCatalog`; no `shopify-a` ela usa UCP_MCP):
+Ou via HTTP, para a busca de catálogo (qualquer supplier com a operação `searchCatalog`; no `hubii` ela usa UCP_MCP):
 
 ```bash
-curl "localhost:8080/suppliers/shopify-a/catalog/search?query=camiseta&limit=5"
-# 200 {"products":[{"id":"...","name":"Camiseta","priceMinor":4990}]}
+curl "localhost:8080/suppliers/hubii/catalog/search?query=ra%C3%A7%C3%A3o&limit=5"
+# 200 {"products":[{"id":"gid://shopify/Product/...","name":"Ração ...","priceMinor":46124,"currency":"BRL"}]}
 # 400 ProblemDetail title=MAPPING_ERROR (supplier/operação inexistente) · 502 title=<code> (falha do parceiro)
 ```
 
