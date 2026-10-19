@@ -1,5 +1,7 @@
 package com.example.commerce.mapping;
 
+import com.example.commerce.CommerceException;
+
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -10,7 +12,6 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class MappingEngineTest {
     private final JsonMapper json = JsonMapper.builder().build();
-    private final MappingCompiler compiler = new MappingCompiler();
     private final MappingEngine engine = new MappingEngine(json);
 
     @Test void trimsAndUppercasesTextInOrderRegardlessOfDefaultLocale() {
@@ -48,18 +49,18 @@ class MappingEngineTest {
     }
 
     @Test void rejectsFractionalMinorUnitsRatherThanRounding() {
-        assertThrows(MappingException.class, () -> map("{\"price\":12.345}", """
+        assertThrows(CommerceException.class, () -> map("{\"price\":12.345}", """
             {"cents":{"path":"$.price","transforms":[{"name":"decimalToMinor","args":{"currency":"BRL"}}]}}
             """));
     }
 
     @Test void rejectsNonTextInputForTrim() {
-        assertThrows(MappingException.class, () -> map("{\"sku\":42}", """
+        assertThrows(CommerceException.class, () -> map("{\"sku\":42}", """
             {"sku":{"path":"$.sku","transforms":[{"name":"trim"}]}}
             """));
     }
 
     private JsonNode map(String source, String rules) {
-        return engine.map(json.readTree(source), compiler.compile(json.readTree(rules)));
+        return engine.map(json.readTree(source), engine.compile(json.readTree(rules)));
     }
 }

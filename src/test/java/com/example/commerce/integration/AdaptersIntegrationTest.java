@@ -1,5 +1,7 @@
 package com.example.commerce.integration;
 
+import com.example.commerce.CommerceException;
+
 import com.example.commerce.mapping.*;
 import com.sun.net.httpserver.HttpServer;
 import io.modelcontextprotocol.client.McpSyncClient;
@@ -43,7 +45,7 @@ class AdaptersIntegrationTest {
         });
         server.createContext("/graphql", ex -> {
             seenBody.set(new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
-            byte[] body = "{\"data\":{\"createCart\":{\"id\":\"G-77\",\"status\":\"created\"}}".getBytes(StandardCharsets.UTF_8);
+            byte[] body = "{\"data\":{\"createCart\":{\"id\":\"G-77\",\"status\":\"created\"}}}".getBytes(StandardCharsets.UTF_8);
             ex.getResponseHeaders().add("Content-Type", "application/json");
             ex.sendResponseHeaders(200, body.length);
             try (var out = ex.getResponseBody()) { out.write(body); }
@@ -60,10 +62,10 @@ class AdaptersIntegrationTest {
         connection.setBaseUrl("http://127.0.0.1:" + port);
         connection.setBearerToken("testing-token");
         configs.getConnections().put("local", connection);
-        registry = new SupplierMappingRegistry(json, new MappingCompiler());
+        registry = new SupplierMappingRegistry(json, new MappingEngine(json));
         var http = new HttpJsonExchange(json, configs);
-        var executor = new ProtocolExecutor(List.of(new RestProtocolAdapter(http), new GraphqlProtocolAdapter(http)));
-        gateway = new SupplierCommerceGateway(registry, new MappingEngine(json), executor);
+        gateway = new SupplierCommerceGateway(registry, new MappingEngine(json),
+            List.of(new RestProtocolAdapter(http), new GraphqlProtocolAdapter(http)));
     }
     @AfterEach void teardown() { if (server != null) server.stop(0); }
 
@@ -110,14 +112,14 @@ class AdaptersIntegrationTest {
         var route = new SupplierMappingRegistry.Route("REST", "local", "/carts", "GET");
         var adapter = new RestProtocolAdapter(new HttpJsonExchange(json, configs));
         for (String query : List.of("{\"items\":[]}", "{\"filter\":{}}")) {
-            assertEquals("INVALID_REQUEST", assertThrows(IntegrationException.class,
+            assertEquals("INVALID_REQUEST", assertThrows(CommerceException.class,
                 () -> adapter.execute(route, json.readTree(query))).code());
         }
     }
 
     @Test void restHttpErrorIsNotSilentlyMapped() {
         var route = new SupplierMappingRegistry.Route("REST", "local", "/error", "POST");
-        var ex = assertThrows(IntegrationException.class,
+        var ex = assertThrows(CommerceException.class,
             () -> new RestProtocolAdapter(new HttpJsonExchange(json, configs)).execute(route, json.readTree("{}")));
         assertEquals("HTTP_ERROR", ex.code());
         assertEquals(503, ex.httpStatus());
@@ -128,14 +130,15 @@ class AdaptersIntegrationTest {
         McpSyncClient sdkClient = mock(McpSyncClient.class);
         var ok = new McpSchema.CallToolResult(List.of(), false, Map.of("cart", Map.of("id", "MCP-5")), Map.of());
         when(sdkClient.callTool(any(McpSchema.CallToolRequest.class))).thenReturn(ok);
-        var adapter = new McpProtocolAdapter(route -> sdkClient, json);
+        var adapter = spy(new McpProtocolAdapter(configs, json));
         var route = new SupplierMappingRegistry.Route("UCP_MCP", "local", "/mcp", "create_cart");
+        doReturn(sdkClient).when(adapter).client(route);
         assertEquals("MCP-5", adapter.execute(route, json.readTree("{\"cart\":{}}"))
             .at("/cart/id").asText());
         verify(sdkClient).callTool(argThat((McpSchema.CallToolRequest req) -> req.name().equals("create_cart")));
         when(sdkClient.callTool(any(McpSchema.CallToolRequest.class)))
             .thenReturn(new McpSchema.CallToolResult(List.of(), true, null, Map.of()));
-        assertEquals("MCP_TOOL_ERROR", assertThrows(IntegrationException.class,
+        assertEquals("MCP_TOOL_ERROR", assertThrows(CommerceException.class,
             () -> adapter.execute(route, json.readTree("{}"))).code());
     }
 
@@ -164,7 +167,7 @@ class AdaptersIntegrationTest {
 
     @Test void disallowsUntrustedOutboundConnection() {
         var route = new SupplierMappingRegistry.Route("REST", "unregistered", "/carts", "POST");
-        var error = assertThrows(IntegrationException.class,
+        var error = assertThrows(CommerceException.class,
             () -> new RestProtocolAdapter(new HttpJsonExchange(json, configs)).execute(route, json.readTree("{}")));
         assertEquals("CONNECTION_UNKNOWN", error.code());
     }

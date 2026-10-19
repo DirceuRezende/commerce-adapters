@@ -1,5 +1,6 @@
 package com.example.commerce.integration;
 
+import com.example.commerce.CommerceException;
 import com.example.commerce.mapping.SupplierMappingRegistry.Route;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import java.net.URI;
@@ -33,10 +34,10 @@ public class PartnerConnections {
 
     public Connection lookup(Route route) {
         Connection connection = connections.get(route.connection());
-        if (connection == null) throw new IntegrationException("CONNECTION_UNKNOWN", null, "Connection não registrada: " + route.connection());
+        if (connection == null) throw new CommerceException("CONNECTION_UNKNOWN", null, "Connection não registrada: " + route.connection());
         validateBase(connection.getBaseUrl());
         if (connection.getTimeout() == null || connection.getTimeout().isNegative() || connection.getTimeout().isZero())
-            throw new IntegrationException("CONNECTION_INVALID", null, "Timeout inválido");
+            throw new CommerceException("CONNECTION_INVALID", null, "Timeout inválido");
         return connection;
     }
     public URI uri(Route route) {
@@ -46,7 +47,7 @@ public class PartnerConnections {
         return URI.create(base.toString() + route.path());
     }
     public static void validateBase(String value) {
-        if (value == null) throw new IntegrationException("CONNECTION_INVALID", null, "baseUrl ausente");
+        if (value == null) throw new CommerceException("CONNECTION_INVALID", null, "baseUrl ausente");
         try {
             URI uri = URI.create(value);
             String host = uri.getHost();
@@ -57,7 +58,7 @@ public class PartnerConnections {
                 && !("http".equalsIgnoreCase(uri.getScheme()) && (host.equals("localhost") || host.equals("127.0.0.1"))))
                 throw new IllegalArgumentException("HTTPS é obrigatório fora de localhost");
         } catch (IllegalArgumentException ex) {
-            throw new IntegrationException("CONNECTION_INVALID", null, "baseUrl inválida ou insegura", ex);
+            throw new CommerceException("CONNECTION_INVALID", null, "baseUrl inválida ou insegura", ex);
         }
     }
 }

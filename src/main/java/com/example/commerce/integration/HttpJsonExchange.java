@@ -1,5 +1,6 @@
 package com.example.commerce.integration;
 
+import com.example.commerce.CommerceException;
 import com.example.commerce.mapping.SupplierMappingRegistry.Route;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
@@ -41,28 +42,28 @@ public class HttpJsonExchange {
                 b.header("Content-Type", "application/json");
                 b.method(verb, HttpRequest.BodyPublishers.ofString(mapper.writeValueAsString(body)));
             }
-            default -> throw new IntegrationException("METHOD_UNSUPPORTED", null, "Método HTTP não permitido");
+            default -> throw new CommerceException("METHOD_UNSUPPORTED", null, "Método HTTP não permitido");
         }
         try {
             HttpResponse<java.io.InputStream> response = http.send(b.build(), HttpResponse.BodyHandlers.ofInputStream());
             try (var stream = response.body()) {
                 byte[] bytes = stream.readNBytes(MAX_RESPONSE_BYTES + 1);
                 if (bytes.length > MAX_RESPONSE_BYTES)
-                    throw new IntegrationException("BODY_TOO_LARGE", response.statusCode(), "Resposta excede limite");
+                    throw new CommerceException("BODY_TOO_LARGE", response.statusCode(), "Resposta excede limite");
                 int status = response.statusCode();
                 if (status < 200 || status >= 300)
-                    throw new IntegrationException("HTTP_ERROR", status, "Parceiro retornou HTTP " + status);
-                if (bytes.length == 0) throw new IntegrationException("EMPTY_RESPONSE", status, "Resposta sem corpo JSON");
+                    throw new CommerceException("HTTP_ERROR", status, "Parceiro retornou HTTP " + status);
+                if (bytes.length == 0) throw new CommerceException("EMPTY_RESPONSE", status, "Resposta sem corpo JSON");
                 try { return mapper.readTree(new String(bytes, StandardCharsets.UTF_8)); }
                 catch (RuntimeException e) {
-                    throw new IntegrationException("INVALID_JSON", status, "JSON de resposta inválido", e);
+                    throw new CommerceException("INVALID_JSON", status, "JSON de resposta inválido", e);
                 }
             }
         } catch (IOException e) {
-            throw new IntegrationException("NETWORK_ERROR", null, "Falha na comunicação com fornecedor", e);
+            throw new CommerceException("NETWORK_ERROR", null, "Falha na comunicação com fornecedor", e);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new IntegrationException("INTERRUPTED", null, "Requisição interrompida", e);
+            throw new CommerceException("INTERRUPTED", null, "Requisição interrompida", e);
         }
     }
 
@@ -73,16 +74,16 @@ public class HttpJsonExchange {
             String name = config.getApiKeyHeader();
             if (name == null || !name.matches("[A-Za-z0-9-]{1,60}") ||
                 Set.of("host", "authorization", "content-length", "connection").contains(name.toLowerCase(Locale.ROOT)))
-                throw new IntegrationException("CONNECTION_INVALID", null, "Nome de header de API Key proibido");
+                throw new CommerceException("CONNECTION_INVALID", null, "Nome de header de API Key proibido");
             b.header(name, config.getApiKey());
         }
     }
 
     private static URI withQuery(URI uri, JsonNode query) {
-        if (!query.isObject()) throw new IntegrationException("INVALID_REQUEST", null, "Query params precisam ser objeto");
+        if (!query.isObject()) throw new CommerceException("INVALID_REQUEST", null, "Query params precisam ser objeto");
         List<String> params = new ArrayList<>();
         query.forEachEntry((name, value) -> {
-            if (value.isObject() || value.isArray()) throw new IntegrationException("INVALID_REQUEST", null, "Query param composto: " + name);
+            if (value.isObject() || value.isArray()) throw new CommerceException("INVALID_REQUEST", null, "Query param composto: " + name);
             if (!value.isNull()) params.add(URLEncoder.encode(name, StandardCharsets.UTF_8)
                 + "=" + URLEncoder.encode(value.asText(), StandardCharsets.UTF_8));
         });
