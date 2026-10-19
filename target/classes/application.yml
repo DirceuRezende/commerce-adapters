@@ -1,0 +1,15 @@
+commerce:
+  connections:
+    rest-b:
+      base-url: ${REST_B_URL:https://api.example.invalid}
+      bearer-token: ${REST_B_TOKEN:}
+      timeout: 8s
+    graphql-c:
+      base-url: ${GRAPHQL_C_URL:https://graphql.example.invalid}
+      api-key-header: X-API-Key
+      api-key: ${GRAPHQL_C_API_KEY:}
+      timeout: 8s
+    shopify-a:
+      base-url: ${SHOPIFY_A_URL:https://shop.example.invalid}
+      bearer-token: ${SHOPIFY_A_TOKEN:}
+      timeout: 15s

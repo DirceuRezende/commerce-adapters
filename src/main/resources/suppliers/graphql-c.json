@@ -1,0 +1,21 @@
+{
+  "supplierId": "graphql-c", "version": 1,
+  "operations": {
+    "createCart": {
+      "route": {"transport": "GRAPHQL", "connection": "graphql-c", "path": "/graphql", "action": "createCart"},
+      "requestMapping": {
+        "query": {"literal": "mutation CreateCart($items: [CartItemInput!]!) { createCart(items: $items) { id status } }"},
+        "variables": {"path": "$", "fields": {
+          "items": {"path": "$.items[*]", "each": {
+            "variantId": {"path": "$.externalVariantId"},
+            "quantity": {"path": "$.quantity"}
+          }}
+        }}
+      },
+      "responseMapping": {
+        "externalCartId": {"path": "$.createCart.id", "required": true},
+        "status": {"path": "$.createCart.status", "required": true}
+      }
+    }
+  }
+}
