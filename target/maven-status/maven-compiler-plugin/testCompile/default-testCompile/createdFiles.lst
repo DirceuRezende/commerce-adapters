@@ -1,3 +1,5 @@
-com/example/commerce/mapping/MappingEngineTest.class
-com/example/commerce/integration/AdaptersIntegrationTest.class
+com/example/commerce/mapping/SupplierCommerceGatewayTest.class
 com/example/commerce/CommerceApplicationTest.class
+com/example/commerce/mapping/MappingEngineTest.class
+com/example/commerce/integration/McpAdapterTest.class
+com/example/commerce/integration/AdaptersIntegrationTest.class

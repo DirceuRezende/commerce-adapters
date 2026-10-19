@@ -1,6 +1,6 @@
 package com.example.commerce;
 
-import com.example.commerce.mapping.SupplierMappingRegistry;
+import com.example.commerce.mapping.SupplierCommerceGateway;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.builder.SpringApplicationBuilder;
@@ -11,7 +11,7 @@ class CommerceApplicationTest {
     @Test void startsAndLoadsSupplierMappings() {
         try (var context = new SpringApplicationBuilder(CommerceApplication.class)
                 .web(WebApplicationType.NONE).run()) {
-            var registry = context.getBean(SupplierMappingRegistry.class);
+            var registry = context.getBean(SupplierCommerceGateway.class);
             for (String supplier : new String[] {"rest-b", "graphql-c", "shopify-a"}) {
                 assertNotNull(registry.active(supplier).operation("createCart"));
             }

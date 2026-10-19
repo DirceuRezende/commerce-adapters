@@ -1,7 +1,7 @@
 package com.example.commerce.integration;
 
 import com.example.commerce.CommerceException;
-import com.example.commerce.mapping.SupplierMappingRegistry.Route;
+import com.example.commerce.mapping.SupplierCommerceGateway.Route;
 import io.modelcontextprotocol.spec.McpSchema;
 import io.modelcontextprotocol.client.McpClient;
 import io.modelcontextprotocol.client.McpSyncClient;
@@ -16,17 +16,16 @@ import java.util.Map;
 
 @Component
 /** Maintains one application-scoped MCP session per trusted connection and endpoint. */
-public class McpProtocolAdapter implements ProtocolAdapter {
+public class McpAdapter {
     private final PartnerConnections connections;
     private final Map<String, McpSyncClient> clients = new ConcurrentHashMap<>();
     private final JsonMapper mapper;
-    public McpProtocolAdapter(PartnerConnections connections, JsonMapper mapper) {
+    public McpAdapter(PartnerConnections connections, JsonMapper mapper) {
         this.connections = connections; this.mapper = mapper;
     }
-    @Override public String transport() { return "UCP_MCP"; }
 
-    @Override @SuppressWarnings("unchecked")
-    public JsonNode execute(Route route, JsonNode arguments) {
+    @SuppressWarnings("unchecked")
+    public JsonNode call(Route route, JsonNode arguments) {
         if (!arguments.isObject())
             throw new CommerceException("INVALID_MCP_ARGUMENTS", null, "tools/call exige objeto JSON");
         Map<String, Object> values = mapper.readValue(mapper.writeValueAsString(arguments), Map.class);
@@ -64,7 +63,7 @@ public class McpProtocolAdapter implements ProtocolAdapter {
 
     McpSyncClient createClient(Route route, PartnerConnections.Connection c) {
         HttpRequest.Builder requestBuilder = HttpRequest.newBuilder();
-        HttpJsonExchange.applyAuth(requestBuilder, c);
+        HttpAdapter.applyAuth(requestBuilder, c);
         var transport = HttpClientStreamableHttpTransport.builder(c.getBaseUrl())
             .endpoint(route.path())
             .requestBuilder(requestBuilder)

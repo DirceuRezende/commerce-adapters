@@ -17,6 +17,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
+import static com.example.commerce.mapping.SupplierCommerceGateway.Transport.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -29,7 +30,7 @@ class AdaptersIntegrationTest {
     private final AtomicReference<String> seenBody = new AtomicReference<>();
     private final AtomicReference<String> seenQuery = new AtomicReference<>();
     private PartnerConnections configs;
-    private SupplierMappingRegistry registry;
+    private HttpAdapter http;
     private SupplierCommerceGateway gateway;
 
     @BeforeEach void setup() throws Exception {
@@ -62,15 +63,13 @@ class AdaptersIntegrationTest {
         connection.setBaseUrl("http://127.0.0.1:" + port);
         connection.setBearerToken("testing-token");
         configs.getConnections().put("local", connection);
-        registry = new SupplierMappingRegistry(json, new MappingEngine(json));
-        var http = new HttpJsonExchange(json, configs);
-        gateway = new SupplierCommerceGateway(registry, new MappingEngine(json),
-            List.of(new RestProtocolAdapter(http), new GraphqlProtocolAdapter(http)));
+        http = new HttpAdapter(json, configs);
+        gateway = new SupplierCommerceGateway(json, new MappingEngine(json), http, mock(McpAdapter.class));
     }
     @AfterEach void teardown() { if (server != null) server.stop(0); }
 
     @Test void restEndToEndWithRequestAndResponseMappings() {
-        registry.publish("""
+        gateway.publish("""
           {"supplierId":"local-rest","version":1,"operations":{"createCart":{
           "route":{"transport":"REST","connection":"local","path":"/carts","action":"POST"},
           "requestMapping":{"items":{"path":"$.items[*]","each":{
@@ -78,7 +77,7 @@ class AdaptersIntegrationTest {
           "responseMapping":{"externalCartId":{"path":"$.cart_id","required":true}}
           }}}
           """);
-        registry.activate("local-rest", 1);
+        gateway.activate("local-rest", 1);
         JsonNode canonical = json.readTree("""
           {"items":[{"externalVariantId":"SKU-42","quantity":2}]}
           """);
@@ -91,9 +90,8 @@ class AdaptersIntegrationTest {
     }
 
     @Test void graphqlMutationChecksData() {
-        var adapter = new GraphqlProtocolAdapter(new HttpJsonExchange(json, configs));
-        var route = new SupplierMappingRegistry.Route("GRAPHQL", "local", "/graphql", "createCart");
-        JsonNode response = adapter.execute(route, json.readTree("""
+        var route = new SupplierCommerceGateway.Route(GRAPHQL, "local", "/graphql", "createCart");
+        JsonNode response = http.graphql(route, json.readTree("""
           {"query":"mutation { createCart { id status } }"}
           """));
         assertEquals("G-77", response.at("/createCart/id").asText());
@@ -101,26 +99,25 @@ class AdaptersIntegrationTest {
     }
 
     @Test void restGetEncodesPrimitiveQueryParametersAndOmitsNulls() {
-        var route = new SupplierMappingRegistry.Route("REST", "local", "/carts", "GET");
-        new RestProtocolAdapter(new HttpJsonExchange(json, configs)).execute(route, json.readTree("""
+        var route = new SupplierCommerceGateway.Route(REST, "local", "/carts", "GET");
+        http.rest(route, json.readTree("""
             {"sku":"SKU 42&x","quantity":2,"available":true,"optional":null}
             """));
         assertEquals("sku=SKU+42%26x&quantity=2&available=true", seenQuery.get());
     }
 
     @Test void restGetRejectsCompositeQueryParameters() {
-        var route = new SupplierMappingRegistry.Route("REST", "local", "/carts", "GET");
-        var adapter = new RestProtocolAdapter(new HttpJsonExchange(json, configs));
+        var route = new SupplierCommerceGateway.Route(REST, "local", "/carts", "GET");
         for (String query : List.of("{\"items\":[]}", "{\"filter\":{}}")) {
             assertEquals("INVALID_REQUEST", assertThrows(CommerceException.class,
-                () -> adapter.execute(route, json.readTree(query))).code());
+                () -> http.rest(route, json.readTree(query))).code());
         }
     }
 
     @Test void restHttpErrorIsNotSilentlyMapped() {
-        var route = new SupplierMappingRegistry.Route("REST", "local", "/error", "POST");
+        var route = new SupplierCommerceGateway.Route(REST, "local", "/error", "POST");
         var ex = assertThrows(CommerceException.class,
-            () -> new RestProtocolAdapter(new HttpJsonExchange(json, configs)).execute(route, json.readTree("{}")));
+            () -> http.rest(route, json.readTree("{}")));
         assertEquals("HTTP_ERROR", ex.code());
         assertEquals(503, ex.httpStatus());
         assertFalse(ex.getMessage().contains("secret"));
@@ -130,20 +127,20 @@ class AdaptersIntegrationTest {
         McpSyncClient sdkClient = mock(McpSyncClient.class);
         var ok = new McpSchema.CallToolResult(List.of(), false, Map.of("cart", Map.of("id", "MCP-5")), Map.of());
         when(sdkClient.callTool(any(McpSchema.CallToolRequest.class))).thenReturn(ok);
-        var adapter = spy(new McpProtocolAdapter(configs, json));
-        var route = new SupplierMappingRegistry.Route("UCP_MCP", "local", "/mcp", "create_cart");
+        var adapter = spy(new McpAdapter(configs, json));
+        var route = new SupplierCommerceGateway.Route(UCP_MCP, "local", "/mcp", "create_cart");
         doReturn(sdkClient).when(adapter).client(route);
-        assertEquals("MCP-5", adapter.execute(route, json.readTree("{\"cart\":{}}"))
+        assertEquals("MCP-5", adapter.call(route, json.readTree("{\"cart\":{}}"))
             .at("/cart/id").asText());
         verify(sdkClient).callTool(argThat((McpSchema.CallToolRequest req) -> req.name().equals("create_cart")));
         when(sdkClient.callTool(any(McpSchema.CallToolRequest.class)))
             .thenReturn(new McpSchema.CallToolResult(List.of(), true, null, Map.of()));
         assertEquals("MCP_TOOL_ERROR", assertThrows(CommerceException.class,
-            () -> adapter.execute(route, json.readTree("{}"))).code());
+            () -> adapter.call(route, json.readTree("{}"))).code());
     }
 
     @Test void graphqlGatewayEndToEnd() {
-        registry.publish("""
+        gateway.publish("""
           {"supplierId":"local-graphql","version":1,"operations":{"createCart":{
             "route":{"transport":"GRAPHQL","connection":"local","path":"/graphql","action":"createCart"},
             "requestMapping":{
@@ -156,7 +153,7 @@ class AdaptersIntegrationTest {
             "responseMapping":{"externalCartId":{"path":"$.createCart.id","required":true}}
           }}}
           """);
-        registry.activate("local-graphql", 1);
+        gateway.activate("local-graphql", 1);
         var cart = json.readTree("""
             {"items":[{"externalVariantId":"VAR-1", "quantity":3}]}
             """);
@@ -166,9 +163,9 @@ class AdaptersIntegrationTest {
     }
 
     @Test void disallowsUntrustedOutboundConnection() {
-        var route = new SupplierMappingRegistry.Route("REST", "unregistered", "/carts", "POST");
+        var route = new SupplierCommerceGateway.Route(REST, "unregistered", "/carts", "POST");
         var error = assertThrows(CommerceException.class,
-            () -> new RestProtocolAdapter(new HttpJsonExchange(json, configs)).execute(route, json.readTree("{}")));
+            () -> http.rest(route, json.readTree("{}")));
         assertEquals("CONNECTION_UNKNOWN", error.code());
     }
 

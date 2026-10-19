@@ -1,7 +1,7 @@
 package com.example.commerce.integration;
 
 import com.example.commerce.CommerceException;
-import com.example.commerce.mapping.SupplierMappingRegistry.Route;
+import com.example.commerce.mapping.SupplierCommerceGateway.Route;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import java.net.URI;
 import java.time.Duration;

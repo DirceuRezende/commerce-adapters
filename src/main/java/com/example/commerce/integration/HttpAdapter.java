@@ -1,7 +1,7 @@
 package com.example.commerce.integration;
 
 import com.example.commerce.CommerceException;
-import com.example.commerce.mapping.SupplierMappingRegistry.Route;
+import com.example.commerce.mapping.SupplierCommerceGateway.Route;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -16,18 +16,37 @@ import java.time.Duration;
 import java.util.*;
 
 @Component
-public class HttpJsonExchange {
+/** REST and GraphQL over JSON with the JDK HttpClient. */
+public class HttpAdapter {
     private static final int MAX_RESPONSE_BYTES = 2_000_000;
     private final HttpClient http = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(3)).followRedirects(HttpClient.Redirect.NEVER).build();
     private final JsonMapper mapper;
     private final PartnerConnections connections;
 
-    public HttpJsonExchange(JsonMapper mapper, PartnerConnections connections) {
+    public HttpAdapter(JsonMapper mapper, PartnerConnections connections) {
         this.mapper = mapper; this.connections = connections;
     }
 
-    public JsonNode execute(Route route, String method, JsonNode body, boolean queryParams) {
+    public JsonNode rest(Route route, JsonNode payload) {
+        return execute(route, route.action(), payload, "GET".equalsIgnoreCase(route.action()));
+    }
+
+    public JsonNode graphql(Route route, JsonNode payload) {
+        if (!payload.isObject() || !payload.path("query").isTextual())
+            throw new CommerceException("INVALID_GRAPHQL_REQUEST", null, "GraphQL exige query textual");
+        JsonNode result = execute(route, "POST", payload, false);
+        JsonNode errors = result.path("errors");
+        // Strict policy: partial success with errors is NOT silently accepted for commerce operations.
+        if (errors.isArray() && !errors.isEmpty())
+            throw new CommerceException("GRAPHQL_ERRORS", 200, "GraphQL retornou errors");
+        JsonNode data = result.path("data");
+        if (data.isMissingNode() || data.isNull() || !data.isObject())
+            throw new CommerceException("GRAPHQL_NO_DATA", 200, "GraphQL sem objeto data");
+        return data; // subsequent JsonPath rules start at $.field, not $.data.field
+    }
+
+    private JsonNode execute(Route route, String method, JsonNode body, boolean queryParams) {
         PartnerConnections.Connection c = connections.lookup(route);
         URI uri = connections.uri(route);
         if (queryParams) uri = withQuery(uri, body);

@@ -15,7 +15,7 @@ import java.util.*;
 @Component
 public class MappingEngine {
     public record Transform(String name, JsonNode args) {}
-    public record Rule(JsonPath path, boolean hasLiteral, JsonNode literal, boolean required,
+    public record Rule(JsonPath path, JsonNode literal, boolean required,
                        List<Transform> transforms, Map<String, Rule> fields, Map<String, Rule> each) {}
 
     private static final Set<String> TRANSFORMS = Set.of("trim", "uppercase", "greaterThan", "decimalToMinor");
@@ -53,7 +53,7 @@ public class MappingEngine {
                     transforms.add(new Transform(name, t.get("args")));
                 }
             }
-            compiled.put(key, new Rule(path, hasLiteral, r.get("literal"), r.path("required").asBoolean(false),
+            compiled.put(key, new Rule(path, r.get("literal"), r.path("required").asBoolean(false),
                 List.copyOf(transforms), r.has("fields") ? compile(r.get("fields"), depth+1) : Map.of(),
                 r.has("each") ? compile(r.get("each"), depth+1) : Map.of()));
         });
@@ -82,7 +82,7 @@ public class MappingEngine {
 
     private JsonNode evaluate(DocumentContext context, Rule rule) {
         JsonNode value;
-        if (rule.hasLiteral()) value = rule.literal().deepCopy();
+        if (rule.literal() != null) value = rule.literal().deepCopy();
         else {
             try { value = context.read(rule.path(), JsonNode.class); }
             catch (PathNotFoundException ex) {
