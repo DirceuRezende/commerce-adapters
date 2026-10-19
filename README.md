@@ -58,6 +58,8 @@ O código principal tem 8 arquivos Java: aplicação, exceção comum, engine, g
 
 Fluxo: `gateway.execute` → `MappingEngine.map(request)` → `switch (transport)` (`REST` → `HttpAdapter.rest`, `GRAPHQL` → `HttpAdapter.graphql`, `UCP_MCP` → `McpAdapter.call`) → `MappingEngine.map(response)`.
 
+Explicação detalhada de cada classe de mapping e integração: [docs/fluxo.md](docs/fluxo.md).
+
 - `MappingEngine`: valida, compila e aplica regras de JsonPath, literais, transforms, arrays e objetos para request e response.
 - `SupplierCommerceGateway`: carrega os JSONs de `suppliers/*.json` na inicialização, gerencia versões imutáveis (publicação e ativação), fixa uma versão para toda a operação, aplica os dois mappings e despacha pelo enum `Transport` da rota.
 - `HttpAdapter`: JDK HttpClient com redirecionamentos desabilitados, autenticação bearer/api-key, limite de corpo de resposta 2 MB e erros com códigos estruturados. `rest`: GET com query primitives; POST/PUT/PATCH/DELETE em JSON; HTTP status explícito. `graphql`: POST com `query`/`variables`, falha quando houver `errors`, retorna somente `data`.
